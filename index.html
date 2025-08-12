@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias Explorer</title>
+    <style>
+        /* --- CSS RESET & BASIC SETUP --- */
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover-color: #2563eb;
+            --bg-color: #f8fafc;
+            --card-bg-color: #ffffff;
+            --text-color: #1e293b;
+            --text-muted-color: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+            --header-bg-color: rgba(255, 255, 255, 0.8);
+            --nav-bg-color: #ffffff;
+            --search-bg-color: #f1f5f9;
+        }
+
+        .dark-mode {
+            --bg-color: #0f172a;
+            --card-bg-color: #1e293b;
+            --text-color: #e2e8f0;
+            --text-muted-color: #94a3b8;
+            --border-color: #334155;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --header-bg-color: rgba(30, 41, 59, 0.8);
+            --nav-bg-color: #1e293b;
+            --search-bg-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #e5e7eb;
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #app-container {
+            max-width: 420px;
+            height: 100vh;
+            max-height: 896px;
+            margin: auto;
+            background-color: var(--bg-color);
+            border-left: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        @media (min-width: 421px) {
+             #app-container {
+                margin: 2rem auto;
+                border-radius: 24px;
+             }
+        }
+
+        /* --- SCREEN & TRANSITION SYSTEM --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(100%);
+            transition: transform 0.35s ease-in-out, opacity 0.35s ease-in-out, visibility 0.35s;
+            overflow-y: auto;
+            padding: 70px 20px 100px 20px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0);
+        }
+        
+        .screen.no-transform {
+            transform: translateX(0);
+        }
+
+        /* --- HEADERS --- */
+        .screen-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            background-color: var(--header-bg-color);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .screen-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+            width: 100%;
+        }
+
+        .back-button, .search-icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            left: 8px;
+            top: 10px;
+            color: var(--text-muted-color);
+        }
+        
+        .search-icon-btn {
+            left: auto;
+            right: 8px;
+        }
+        
+        .back-button svg, .search-icon-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* --- BOTTOM NAVIGATION --- */
+        #bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background-color: var(--nav-bg-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 10px;
+            z-index: 100;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            color: var(--text-muted-color);
+            font-size: 0.7rem;
+            border: none;
+            background: none;
+            width: 60px;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+        }
+
+        .nav-item svg {
+            width: 28px;
+            height: 28px;
+            margin-bottom: 4px;
+        }
+
+        /* --- GENERAL COMPONENTS --- */
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover-color);
+        }
+        
+        .card {
+            background-color: var(--card-bg-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px var(--shadow-color);
+            transition: background-color 0.3s, border-color 0.3s, transform 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        /* --- HOME SCREEN --- */
+        #home-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding-bottom: 80px;
+        }
+
+        .welcome-image-container {
+            width: 80%;
+            max-width: 250px;
+            border: 6px solid white;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+        }
+
+        .welcome-image {
+            width: 100%;
+            display: block;
+            border-radius: 2px;
+        }
+
+        .welcome-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        .welcome-subtitle {
+            font-size: 1rem;
+            color: var(--text-muted-color);
+            margin-bottom: 2rem;
+        }
+
+        /* --- CATEGORIES SCREEN --- */
+        .category-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .category-card-text h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-color);
+        }
+        
+        .category-card-text p {
+            font-size: 0.9rem;
+            color: var(--text-muted-color);
+        }
+
+        .category-card-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 16px;
+            transition: opacity 0.3s;
+        }
+        
+        .hide-images .category-card-image {
+            display: none;
+        }
+        
+        .category-card-image img {
+            width: 80%;
+            height: 80%;
+            object-fit: cover;
+        }
+        
+        /* --- CATEGORY DETAIL SCREEN --- */
+        .subcategory-group {
+            margin-bottom: 2rem;
+        }
+        
+        .subcategory-header {
+            font-size: 1rem;
+            font-weight: 600;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+        
+        .bias-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .bias-list-item:hover {
+            background-color: var(--search-bg-color);
+        }
+        
+        .bias-list-item h4 {
+            font-weight: 500;
+        }
+        
+        .bias-list-item svg {
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted-color);
+        }
+        
+        /* --- BIAS DETAIL SCREEN --- */
+        #bias-detail-screen .detail-image-container {
+            height: 150px;
+            margin: -70px -20px 24px -20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #bias-detail-screen .detail-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(4px);
+            transform: scale(1.1);
+            transition: opacity 0.3s;
+        }
+        
+        .hide-images #bias-detail-screen .detail-image-container {
+            display: none;
+        }
+
+        #bias-detail-screen .content-section {
+            margin-bottom: 2rem;
+        }
+
+        #bias-detail-screen h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: var(--text-color);
+        }
+
+        #bias-detail-screen p {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text-muted-color);
+        }
+        
+        #bias-detail-screen .quiz-button-container {
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        /* --- SEARCH SCREEN --- */
+        .search-bar-container {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--search-bg-color);
+            font-size: 1rem;
+            color: var(--text-color);
+            outline: none;
+        }
+        
+        #search-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+
+        .search-bar-container svg {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted-color);
+        }
+        
+        #search-results {
+            padding-bottom: 80px;
+        }
+        
+        .search-result-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+        
+        .search-result-item:hover {
+            background-color: var(--search-bg-color);
+        }
+        
+        .search-result-item h4 {
+            font-weight: 500;
+        }
+        
+        .search-result-item p {
+            font-size: 0.85rem;
+            color: var(--text-muted-color);
+        }
+        
+        #no-results {
+            text-align: center;
+            color: var(--text-muted-color);
+            margin-top: 2rem;
+        }
+
+        /* --- SETTINGS MODAL --- */
+        #settings-modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background-color: var(--card-bg-color);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(100%);
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        #settings-modal.active {
+            transform: translateY(0);
+        }
+        
+        .settings-header {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+        
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 199;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s;
+        }
+        
+        #modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <main id="main-content">
+            <!-- Home Screen -->
+            <div id="home-screen" class="screen active">
+                <div class="welcome-image-container">
+                    <img src="https://images.unsplash.com/photo-1598991211195-1647416353d2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=774&q=80" alt="City street with tall buildings" class="welcome-image">
+                </div>
+                <h1 class="welcome-title">Bias Explorer</h1>
+                <p class="welcome-subtitle">Explore cognitive biases and logical fallacies.</p>
+                <button id="start-exploring-btn" class="btn">Start Exploring</button>
+            </div>
+
+            <!-- Categories Screen -->
+            <div id="categories-screen" class="screen">
+                <header class="screen-header">
+                    <h2>Cognitive Biases</h2>
+                    <button class="search-icon-btn nav-item" data-target="search-screen">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                    </button>
+                </header>
+                <div id="categories-list"></div>
+            </div>
+            
+            <!-- Category Detail Screen -->
+            <div id="category-detail-screen" class="screen">
+                <header class="screen-header">
+                    <button class="back-button"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2 id="category-detail-title"></h2>
+                </header>
+                <div id="category-detail-content"></div>
+            </div>
+            
+            <!-- Bias Detail Screen -->
+            <div id="bias-detail-screen" class="screen">
+                <header class="screen-header">
+                    <button class="back-button"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2 id="bias-detail-title"></h2>
+                </header>
+                <div class="detail-image-container">
+                    <img id="bias-detail-image" src="" alt="Abstract background image" class="detail-image">
+                </div>
+                <div id="bias-detail-content"></div>
+                <div class="quiz-button-container">
+                    <button class="btn">Take a Quiz</button>
+                </div>
+            </div>
+
+            <!-- Search Screen -->
+            <div id="search-screen" class="screen">
+                 <header class="screen-header">
+                    <button class="back-button"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2>Search</h2>
+                </header>
+                <div class="search-bar-container">
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg
