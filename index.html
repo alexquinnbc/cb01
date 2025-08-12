@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* --- CSS VARIABLES & SETUP --- */
+        :root {
+            --blue: #3b82f6;
+            --purple: #8b5cf6;
+            --green: #22c55e;
+            --red: #ef4444;
+            --text-light: #f8fafc;
+            --text-dark: #0f172a;
+            --bg-light: rgba(248, 250, 252, 0.75);
+            --bg-dark: rgba(15, 23, 42, 0.75);
+            --border-light: rgba(226, 232, 240, 0.5);
+            --border-dark: rgba(51, 65, 85, 0.5);
+            --shadow-light: rgba(0, 0, 0, 0.1);
+            --shadow-dark: rgba(0, 0, 0, 0.25);
+            --transition-duration: 0.4s;
+            
+            /* Fluid Typography */
+            --font-hero: clamp(3rem, 10vw, 5rem);
+            --font-h2: clamp(1.75rem, 5vw, 2.25rem);
+            --font-h3: clamp(1.25rem, 3vw, 1.5rem);
+            --font-body: clamp(1rem, 1.5vw, 1.125rem);
+            
+            /* Unassigned variables for now */
+            --color-positive: var(--green);
+            --color-negative: var(--red);
+        }
+
+        /* --- THEME & GLOBAL STYLES --- */
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #e5e7eb;
+            color: var(--text-dark);
+            background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+            transition: color 0.3s ease;
+        }
+        
+        body.dark-mode {
+            color: var(--text-light);
+            background: linear-gradient(135deg, #1e293b, #111827);
+        }
+        
+        #animated-bg {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: -1;
+            background: linear-gradient(135deg, var(--blue), var(--purple), var(--blue));
+            background-size: 200% 200%;
+            animation: gradient-flow 5s ease infinite;
+        }
+
+        @keyframes gradient-flow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        #app-container {
+            max-width: 420px; height: 100vh; max-height: 900px;
+            margin: auto;
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column;
+            border-radius: 0;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        
+        @media (min-width: 421px) {
+             #app-container { margin: 2rem auto; border-radius: 24px; border: 1px solid var(--border-light); }
+             body.dark-mode #app-container { border-color: var(--border-dark); }
+        }
+        
+        /* --- UTILITIES --- */
+        .gradient-text {
+            background: linear-gradient(45deg, var(--blue), var(--purple));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; text-fill-color: transparent;
+        }
+
+        /* --- GLASSMORPHISM & UI ELEMENTS --- */
+        .glass-ui {
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        body.dark-mode .glass-ui {
+            background: var(--bg-dark);
+            border-color: var(--border-dark);
+        }
+
+        /* --- SCREEN & TRANSITION SYSTEM --- */
+        .screen {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: transparent;
+            transition: transform var(--transition-duration) cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto; padding: 20px 24px 100px 24px;
+            -webkit-overflow-scrolling: touch;
+            transform: translateX(100%);
+        }
+        .screen.active { transform: translateX(0); }
+        .screen.is-leaving { transform: translateX(-100%); }
+        #home-screen { transform: translateX(0); }
+
+        /* --- CHARACTER ANIMATION --- */
+        .animated-hero-text span {
+            display: inline-block;
+            opacity: 0;
+            filter: blur(4px);
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease;
+        }
+        .animated-hero-text.visible span {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateY(0);
+        }
+
+        /* --- UI COMPONENTS --- */
+        .screen-header {
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 60px; display: flex; align-items: center;
+            padding: 0 16px; z-index: 10;
+        }
+        .screen-header h2 { font-size: var(--font-body); font-weight: 600; text-align: center; width: 100%; }
+        .back-button, .search-icon-btn {
+            background: none; border: none; cursor: pointer;
+            width: 44px; height: 44px;
+            display: flex; align-items: center; justify-content: center;
+            position: absolute; left: 8px; top: 8px;
+            z-index: 11;
+        }
+        .search-icon-btn { left: auto; right: 8px; }
+        .back-button svg, .search-icon-btn svg { width: 24px; height: 24px; color: inherit; }
+
+        #bottom-nav {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 80px; border-top: 1px solid transparent;
+            display: flex; justify-content: space-around;
+            align-items: flex-start; padding-top: 10px; z-index: 100;
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer; opacity: 0.7;
+            font-size: 0.7rem; font-weight: 600;
+            border: none; background: none; width: 60px;
+            transition: opacity 0.2s ease, color 0.2s ease;
+        }
+        .nav-item:hover { opacity: 1; }
+        .nav-item.active { color: var(--blue); opacity: 1; }
+        body.dark-mode .nav-item.active { color: var(--text-light); }
+        .nav-item svg { width: 28px; height: 28px; margin-bottom: 4px; }
+        
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            background-color: var(--blue); color: white;
+            min-height: 48px; padding: 0 24px; border-radius: 12px;
+            font-size: var(--font-body); font-weight: 700;
+            text-decoration: none; border: none; cursor: pointer;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+        .btn:hover { transform: scale(1.05); }
+
+        /* --- HOME SCREEN --- */
+        #home-screen .screen-content {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; height: 100%; padding: 0 24px 80px 24px;
+        }
+        .hero-text { font-size: var(--font-hero); font-weight: 800; line-height: 1.1; margin-bottom: 1rem; }
+        .welcome-title { font-size: var(--font-h3); font-weight: 600; opacity: 0.8; }
+        .welcome-subtitle { font-size: var(--font-body); opacity: 0.7; max-width: 35ch; margin: 1rem auto 2.5rem auto; line-height: 1.6; }
+
+        /* --- CATEGORIES SCREEN --- */
+        #categories-screen .screen-content { padding-top: 76px; }
+        .category-card {
+            background-color: var(--card-bg-light); border-radius: 16px;
+            padding: 24px; margin-bottom: 16px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 6px -1px var(--shadow-light);
+            transition: all 0.2s ease; cursor: pointer;
+        }
+        body.dark-mode .category-card { background-color: var(--card-bg-dark); border-color: var(--border-dark); box-shadow: 0 4px 6px -1px var(--shadow-dark); }
+        .category-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px var(--shadow-light); }
+        body.dark-mode .category-card:hover { box-shadow: 0 10px 15px -3px var(--shadow-dark); }
+        .category-card-text h3 { font-size: var(--font-h3); font-weight: 700; margin-bottom: 8px; }
+        .category-card-text p { font-size: var(--font-body); opacity: 0.7; line-height: 1.5; }
+        
+        /* --- DETAIL SCREENS (CATEGORY/BIAS) --- */
+        .detail-hero-text { font-size: var(--font-h2); font-weight: 800; line-height: 1.2; margin: 60px 0 32px 0; }
+        .subcategory-group { margin-bottom: 2rem; }
+        .subcategory-header { font-size: var(--font-h3); font-weight: 700; padding-bottom: 0.75rem; border-bottom: 1px solid; border-color: inherit; margin-bottom: 1rem; color: var(--blue); }
+        body.dark-mode .subcategory-header { color: var(--text-light); }
+        .bias-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 8px; border-bottom: 1px solid; border-color: var(--border-light);
+            cursor: pointer; transition: background-color 0.2s, border-radius 0.2s;
+        }
+        body.dark-mode .bias-list-item { border-color: var(--border-dark); }
+        .bias-list-item:hover { background-color: rgba(0,0,0,0.05); border-radius: 8px; }
+        body.dark-mode .bias-list-item:hover { background-color: rgba(255,255,255,0.05); }
+        .bias-list-item h4 { font-size: var(--font-body); font-weight: 600; padding-right: 1rem; }
+        .bias-list-item svg { width: 20px; height: 20px; opacity: 0.6; flex-shrink: 0; }
+        .content-section { margin-bottom: 2rem; }
+        .content-section h3 { font-size: var(--font-h3); font-weight: 700; margin-bottom: 1rem; }
+        .content-section p { font-size: var(--font-body); line-height: 1.7; opacity: 0.8; }
+        .quiz-button-container { text-align: center; margin-top: 2rem; }
+        
+        /* --- SEARCH SCREEN --- */
+        #search-screen .screen-content { padding-top: 76px; }
+        #search-input {
+            width: 100%; min-height: 48px; padding: 12px 16px 12px 48px; border-radius: 12px;
+            border: 1px solid var(--border-light); background-color: var(--bg-light);
+            font-size: var(--font-body); color: inherit;
+            outline: none; transition: all 0.2s ease;
+        }
+        body.dark-mode #search-input { border-color: var(--border-dark); background-color: var(--bg-dark); }
+        #search-input:focus, #search-input:focus-visible { box-shadow: 0 0 0 3px var(--blue); border-color: var(--blue) !important; }
+        .search-bar-container { position: relative; margin-bottom: 24px; }
+        .search-bar-container svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; opacity: 0.5; }
+        .search-result-item { padding: 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; border-radius: 8px; }
+        body.dark-mode .search-result-item { border-color: var(--border-dark); }
+        .search-result-item:hover { background-color: rgba(0,0,0,0.05); }
+        body.dark-mode .search-result-item:hover { background-color: rgba(255,255,255,0.05); }
+        .search-result-item h4 { font-size: var(--font-body); font-weight: 600; }
+        .search-result-item p { font-size: 0.9rem; opacity: 0.6; margin-top: 4px; }
+        #no-results-message, #search-prompt-message { text-align: center; opacity: 0.7; margin-top: 2rem; padding: 0 1rem; }
+
+        /* --- SETTINGS MODAL --- */
+        #settings-modal {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+            border-top-left-radius: 24px; border-top-right-radius: 24px;
+            padding: 24px; box-shadow: 0 -10px 30px var(--shadow-light);
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #settings-modal.active { transform: translateY(0); }
+        .settings-header { font-size: var(--font-h3); font-weight: 700; text-align: center; margin-bottom: 24px; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 16px 0; border-bottom: 1px solid; }
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--green); }
+        input:checked + .slider:before { transform: translateX(22px); }
+        #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); z-index: 199; opacity: 0; visibility: hidden; transition: opacity 0.4s ease-in-out; }
+        #modal-overlay.active { opacity: 1; visibility: visible; }
+    </style>
+</head>
+<body>
+    <div id="animated-bg"></div>
+    <div id="app-container">
+        <main id="main-content">
+            <!-- Home Screen -->
+            <div id="home-screen" class="screen active">
+                <div class="screen-content">
+                    <h1 class="welcome-title">Bias Explorer</h1>
+                    <div class="hero-text gradient-text animated-hero-text"></div>
+                    <p class="welcome-subtitle">Explore cognitive biases and logical fallacies to think more clearly.</p>
+                    <button id="start-exploring-btn" class="btn">Start Exploring</button>
+                </div>
+            </div>
+
+            <!-- Categories Screen -->
+            <div id="categories-screen" class="screen">
+                <header class="screen-header glass-ui">
+                    <h2>Cognitive Biases</h2>
+                    <button class="search-icon-btn" data-target="search-screen" aria-label="Search biases">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                    </button>
+                </header>
+                <div class="screen-content" id="categories-list"></div>
+            </div>
+            
+            <!-- Category Detail Screen -->
+            <div id="category-detail-screen" class="screen">
+                <header class="screen-header glass-ui">
+                    <button class="back-button" aria-label="Go back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2 id="category-detail-title"></h2>
+                </header>
+                <div class="screen-content">
+                    <div class="detail-hero-text gradient-text animated-hero-text"></div>
+                    <div id="category-detail-content"></div>
+                </div>
+            </div>
+            
+            <!-- Bias Detail Screen -->
+            <div id="bias-detail-screen" class="screen">
+                <header class="screen-header glass-ui">
+                    <button class="back-button" aria-label="Go back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2 id="bias-detail-title"></h2>
+                </header>
+                 <div class="screen-content">
+                    <div class="detail-hero-text gradient-text animated-hero-text"></div>
+                    <div id="bias-detail-content"></div>
+                </div>
+            </div>
+
+            <!-- Search Screen -->
+            <div id="search-screen" class="screen">
+                 <header class="screen-header glass-ui">
+                    <button class="back-button" aria-label="Go back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2>Search</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="search-bar-container">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                         <input type="text" id="search-input" placeholder="Search for a bias..." aria-label="Search for a bias">
+                    </div>
+                    <div id="search-results-container">
+                        <p id="search-prompt-message">Start typing to search for a bias.</p>
+                        <div id="search-results"></div>
+                        <p id="no-results-message" style="display: none;">No biases found.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <nav id="bottom-nav" class="glass-ui">
+            <button class="nav-item active" data-target="home-screen" aria-label="Home"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h7.5" /></svg><span>Home</span></button>
+            <button class="nav-item" data-target="categories-screen" aria-label="Categories"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg><span>Categories</span></button>
+            <button class="nav-item" data-target="search-screen" aria-label="Search"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg><span>Search</span></button>
+            <button id="settings-btn" class="nav-item" aria-label="Settings"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.26.713.528.97l.923.923c.41.41.41 1.08 0 1.49l-.923.923c-.268.257-.465.596-.528.97l-.213 1.281c-.09.543-.56.94-1.11.94h-2.593c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.26-.713-.528-.97l-.923-.923a1.053 1.053 0 010-1.49l.923-.923c.268-.257.465-.596.528-.97l.213-1.281zM15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span>Settings</span></button>
+        </nav>
+    </div>
+
+    <div id="modal-overlay"></div>
+    <div id="settings-modal" class="glass-ui" role="dialog" aria-modal="true" aria-labelledby="settings-header">
+        <h3 id="settings-header" class="settings-header">Settings</h3>
+        <div class="setting-item"><span>Dark Mode</span><label class="toggle-switch"><input type="checkbox" id="dark-mode-toggle"><span class="slider"></span></label></div>
+        <div class="setting-item"><span>Show Phrases</span><label class="toggle-switch"><input type="checkbox" id="image-toggle" checked><span class="slider"></span></label></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- DATA ---
+            const cognitiveBiasesData = {
+                "too-much-information": { name: "Too Much Information", description: "We filter out, pay attention to specifics, and fill in gaps.", phrase: "Filter Noise", subcategories: { /* ... subcategories from prompt ... */ } },
+                "not-enough-meaning": { name: "Not Enough Meaning", description: "We seek patterns and connections, even if they're not real.", phrase: "Connect Dots", subcategories: { /* ... */ } },
+                "need-to-act-fast": { name: "Need To Act Fast", description: "We make quick decisions to survive and avoid danger.", phrase: "Act Now", subcategories: { /* ... */ } },
+                "what-should-we-remember": { name: "What Should We Remember?", description: "We edit and reinforce memories after the fact.", phrase: "Shape Story", subcategories: { /* ... */ } }
+            };
+            // Populate subcategories for brevity in this display
+            cognitiveBiasesData["too-much-information"].subcategories = { "primed-or-repeated": { name: "We notice things already primed in memory or repeated often", biases: ["Attentional bias", "Availability heuristic", "Baader–Meinhof phenomenon (frequency illusion)", "Cue-dependent forgetting", "Empathy gap", "Frequency illusion", "Illusory truth effect", "Mere exposure effect", "Modality effect", "Priming", "Recency illusion", "Repetition bias", "Salience bias", "Selection bias", "Serial position effect", "Von Restorff effect (isolation effect)"] }, "bizarre-or-funny": { name: "Bizarre, funny, visually striking, or anthropomorphic things stick out more than non-bizarre/unfunny things", biases: ["Humor effect", "Picture superiority effect", "Bizarreness effect", "Self-relevance effect"] }, "changed": { name: "We notice when something has changed", biases: ["Change blindness", "Cyclical thinking", "Anchoring", "Conservatism bias", "Distinction bias"] }, "confirm-beliefs": { name: "We are drawn to details that confirm our own beliefs", biases: ["Confirmation bias", "Congruence bias", "Experimenter’s bias", "Observer-expectancy effect", "Ostrich effect", "Semmelweis reflex", "Subjective validation"] }, "flaws-in-others": { name: "We notice flaws in others more than in ourselves", biases: ["Bias blind spot", "Naïve cynicism", "Naïve realism"] }, "find-patterns": { name: "We tend to find stories and patterns even in sparse data", biases: ["Clustering illusion", "Conjunction fallacy", "Gambler’s fallacy", "Illusory correlation", "Pareidolia", "Anthropomorphism"] } };
+            cognitiveBiasesData["not-enough-meaning"].subcategories = { "stereotypes": { name: "We fill in characteristics from stereotypes, generalities, and prior histories", biases: ["Cross-race effect", "Out-group homogeneity bias", "In-group bias", "Stereotyping"] }, "familiar-is-better": { name: "We imagine things and people we’re familiar with or fond of as better", biases: ["Cheerleader effect", "Halo effect", "Positivity effect", "Positivity bias", "Negativity bias", "Trait ascription bias"] }, "simplify-numbers": { name: "We simplify probabilities and numbers to make them easier to think about", biases: ["Normalcy bias", "Subadditivity effect", "Denomination effect"] }, "know-others-thinking": { name: "We think we know what others are thinking", biases: ["Curse of knowledge", "Illusion of transparency", "Mind reading illusion", "Spotlight effect"] }, "project-mindset": { name: "We project our current mindset and assumptions onto the past and future", biases: ["Impact bias", "Pessimism bias", "Planning fallacy", "Pro-innovation bias", "Projection bias", "Restraint bias", "Self-consistency bias", "Telescoping effect"] } };
+            cognitiveBiasesData["need-to-act-fast"].subcategories = { "must-be-confident": { name: "To act, we must be confident we can make an impact and feel what we do is important", biases: ["Optimism bias", "Overconfidence effect", "Egocentric bias", "Hard–easy effect", "Illusion of control", "Social desirability bias", "Dunning–Kruger effect"] }, "favor-immediate": { name: "To stay focused, we favor the immediate, relatable thing in front of us", biases: ["Hyperbolic discounting", "Present bias", "Appeal to noveltyu", "Identifiable victim effect", "Unit bias", "Zero-risk bias"] }, "complete-things": { name: "To get things done, we tend to complete things we’ve invested time and energy in", biases: ["Sunk cost fallacy", "Escalation of commitment", "IKEA effect", "Endowment effect", "Loss aversion", "Pseudocertainty effect"] }, "avoid-mistakes": { name: "To avoid mistakes, we aim to preserve autonomy and group status, and avoid irreversible decisions", biases: ["Status quo bias", "System justification", "Reactance", "Omission bias", "Decoy effect", "Reverse psychology"] }, "favor-simple": { name: "We favor simple-looking options over complex, ambiguous ones", biases: ["Ambiguity effect", "Information bias", "Overchoice", "Paradox of choice"] } };
+            cognitiveBiasesData["what-should-we-remember"].subcategories = { "edit-memories": { name: "We edit and reinforce some memories after the fact", biases: ["Consistency bias", "Misinformation effect", "Misattribution of memory", "Source confusion", "False memory", "Suggestibility"] }, "form-generalities": { name: "We discard specifics to form generalities", biases: ["Leveling and sharpening", "Stereotypical generalization"] }, "reduce-to-elements": { name: "We reduce events and lists to their key elements", biases: ["Serial position effect", "Peak–end rule", "List length effect"] }, "store-differently": { name: "We store memories differently based on how they were experienced", biases: ["Context effect", "Mood-congruent memory bias", "State-dependent memory"] } };
+
+            const allBiasesFlat = Object.entries(cognitiveBiasesData).flatMap(([categoryId, category]) =>
+                Object.values(category.subcategories).flatMap(subcategory =>
+                    subcategory.biases.map(biasName => ({
+                        name: biasName, categoryName: category.name, categoryId: categoryId,
+                        definition: `The tendency to ${biasName.toLowerCase().replace(/ effect| bias| fallacy| reflex/g, '')}. This is a placeholder definition for "${biasName}".`,
+                        example: `For example, a person exhibiting ${biasName} might... (This is a placeholder example).`,
+                        mitigation: `To combat ${biasName}, one can try to be more aware of their thought processes and actively seek out disconfirming evidence or alternative perspectives.`
+                    }))
+                )
+            );
+
+            // --- STATE & DOM ---
+            let navigationStack = ['home-screen'];
+            const mainContent = document.getElementById('main-content');
+            const navItems = document.querySelectorAll('.nav-item');
+            const settingsBtn = document.getElementById('settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const modalOverlay = document.getElementById('modal-overlay');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const imageToggle = document.getElementById('image-toggle');
+            const rootStyles = getComputedStyle(document.documentElement);
+            const transitionTime = parseFloat(rootStyles.getPropertyValue('--transition-duration')) * 1000;
+
+            // --- ANIMATIONS ---
+            function animateHeroText(element, text) {
+                if (!element) return;
+                element.classList.remove('visible');
+                element.innerHTML = text.split('').map(char => `<span>${char === ' ' ? '&nbsp;' : char}</span>`).join('');
+                // Use a minimal timeout to ensure the browser has rendered the initial state
+                setTimeout(() => element.classList.add('visible'), 50);
+            }
+
+            // --- NAVIGATION ---
+            function navigateTo(screenId) {
+                const currentScreenId = navigationStack[navigationStack.length - 1];
+                if (currentScreenId === screenId) return;
+                const newScreen = document.getElementById(screenId);
+                const currentScreen = document.getElementById(currentScreenId);
+                if (currentScreen) currentScreen.classList.add('is-leaving');
+                newScreen.classList.add('active');
+                navigationStack.push(screenId);
+                updateNav();
+                setTimeout(() => { if (currentScreen) currentScreen.classList.remove('active', 'is-leaving'); }, transitionTime);
+            }
+
+            function goBack() {
+                if (navigationStack.length <= 1) return;
+                const currentScreenId = navigationStack.pop();
+                const newScreenId = navigationStack[navigationStack.length - 1];
+                document.getElementById(currentScreenId).classList.remove('active');
+                const newScreen = document.getElementById(newScreenId);
+                newScreen.classList.add('active');
+                newScreen.classList.remove('is-leaving');
+                updateNav();
+            }
+            
+            function navigateToTab(screenId) {
+                if (navigationStack.length === 1 && navigationStack[0] === screenId) return;
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'is-leaving'));
+                document.getElementById(screenId).classList.add('active');
+                navigationStack = [screenId];
+                updateNav();
+            }
+
+            function updateNav() {
+                const currentTabId = navigationStack[0];
+                navItems.forEach(item => item.classList.toggle('active', item.dataset.target === currentTabId));
+            }
+
+            // --- RENDERING ---
+            function renderCategories() {
+                document.getElementById('categories-list').innerHTML = Object.entries(cognitiveBiasesData).map(([id, category]) => `
+                    <div class="category-card" data-category-id="${id}">
+                        <div class="category-card-text"><h3>${category.name}</h3><p>${category.description}</p></div>
+                        <div class="category-card-phrase gradient-text" aria-hidden="true">${category.phrase.replace(' ', '<br>')}</div>
+                    </div>`).join('');
+            }
+
+            function renderCategoryDetail(categoryId) {
+                const category = cognitiveBiasesData[categoryId];
+                const screen = document.getElementById('category-detail-screen');
+                animateHeroText(screen.querySelector('.animated-hero-text'), category.phrase);
+                screen.querySelector('#category-detail-title').textContent = category.name;
+                screen.querySelector('#category-detail-content').innerHTML = Object.values(category.subcategories).map(sub => `
+                    <div class="subcategory-group">
+                        <h3 class="subcategory-header">${sub.name}</h3>
+                        ${sub.biases.map(biasName => `<div class="bias-list-item" data-bias-name="${biasName}"><h4>${biasName}</h4><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></div>`).join('')}
+                    </div>`).join('');
+                screen.scrollTop = 0;
+                navigateTo('category-detail-screen');
+            }
+
+            function renderBiasDetail(biasName) {
+                const bias = allBiasesFlat.find(b => b.name === biasName);
+                if (!bias) return;
+                const category = cognitiveBiasesData[bias.categoryId];
+                const screen = document.getElementById('bias-detail-screen');
+                animateHeroText(screen.querySelector('.animated-hero-text'), category.phrase);
+                screen.querySelector('#bias-detail-title').textContent = bias.name;
+                screen.querySelector('#bias-detail-content').innerHTML = `
+                    <div class="content-section"><h3>Definition</h3><p>${bias.definition}</p></div>
+                    <div class="content-section"><h3>Examples</h3><p>${bias.example}</p></div>
+                    <div class="content-section"><h3>Mitigation Strategies</h3><p>${bias.mitigation}</p></div>
+                    <div class="quiz-button-container"><button class="btn quiz-btn" data-bias-name="${bias.name}">Take a Quiz</button></div>`;
+                screen.scrollTop = 0;
+                navigateTo('bias-detail-screen');
+            }
+
+            function renderSearchResults(query) {
+                const resultsContainer = document.getElementById('search-results');
+                const noResultsEl = document.getElementById('no-results-message');
+                const searchPrompt = document.getElementById('search-prompt-message');
+                query = query.trim().toLowerCase();
+                searchPrompt.style.display = query ? 'none' : 'block';
+                if (!query) { resultsContainer.innerHTML = ''; noResultsEl.style.display = 'none'; return; }
+                const filteredBiases = allBiasesFlat.filter(b => b.name.toLowerCase().includes(query));
+                noResultsEl.style.display = filteredBiases.length === 0 ? 'block' : 'none';
+                resultsContainer.innerHTML = filteredBiases.map(bias => `<div class="search-result-item" data-bias-name="${bias.name}"><h4>${bias.name}</h4><p>${bias.categoryName}</p></div>`).join('');
+            }
+            
+            // --- SETTINGS ---
+            function applySettings() {
+                const isDarkMode = localStorage.getItem('darkMode') === 'true';
+                document.body.classList.toggle('dark-mode', isDarkMode);
+                darkModeToggle.checked = isDarkMode;
+                const showImages = localStorage.getItem('showImages') !== 'false'; // 'Show Phrases' is the new label
+                document.body.classList.toggle('hide-images', !showImages);
+                imageToggle.checked = showImages;
+            }
+
+            // --- EVENT LISTENERS ---
+            document.getElementById('start-exploring-btn').addEventListener('click', () => navigateToTab('categories-screen'));
+            navItems.forEach(item => { if (item.id !== 'settings-btn') item.addEventListener('click', () => navigateToTab(item.dataset.target)); });
+            document.querySelectorAll('.back-button').forEach(btn => btn.addEventListener('click', goBack));
+            document.querySelectorAll('.search-icon-btn').forEach(btn => btn.addEventListener('click', () => navigateToTab(btn.dataset.target)));
+            mainContent.addEventListener('click', e => {
+                const categoryCard = e.target.closest('.category-card');
+                if (categoryCard) renderCategoryDetail(categoryCard.dataset.categoryId);
+                const biasListItem = e.target.closest('.bias-list-item, .search-result-item');
+                if (biasListItem) renderBiasDetail(biasListItem.dataset.biasName);
+                const quizBtn = e.target.closest('.quiz-btn');
+                if (quizBtn) alert(`Quiz for "${quizBtn.dataset.biasName}" is not yet implemented.`);
+            });
+            document.getElementById('search-input').addEventListener('input', e => renderSearchResults(e.target.value));
+            settingsBtn.addEventListener('click', () => { settingsModal.classList.add('active'); modalOverlay.classList.add('active'); });
+            modalOverlay.addEventListener('click', () => { settingsModal.classList.remove('active'); modalOverlay.classList.remove('active'); });
+            darkModeToggle.addEventListener('change', () => {
+                localStorage.setItem('darkMode', String(darkModeToggle.checked));
+                applySettings();
+            });
+            imageToggle.addEventListener('change', () => {
+                localStorage.setItem('showImages', String(imageToggle.checked));
+                applySettings();
+            });
+
+            // --- INITIALIZATION ---
+            applySettings();
+            renderCategories();
+            updateNav();
+            animateHeroText(document.querySelector('#home-screen .animated-hero-text'), 'Unbias Your Mind');
+        });
+    </script>
+</body>
+</html>
