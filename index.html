@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias Explorer</title>
+    <style>
+        /* --- CSS RESET & BASIC SETUP --- */
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover-color: #2563eb;
+            --gradient-end-color: #818cf8;
+            --bg-color: #f8fafc;
+            --card-bg-color: #ffffff;
+            --text-color: #1e293b;
+            --text-muted-color: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+            --header-bg-color: rgba(255, 255, 255, 0.8);
+            --nav-bg-color: #ffffff;
+            --search-bg-color: #f1f5f9;
+            --transition-duration: 0.35s;
+        }
+
+        .dark-mode {
+            --bg-color: #0f172a;
+            --card-bg-color: #1e293b;
+            --text-color: #e2e8f0;
+            --text-muted-color: #94a3b8;
+            --border-color: #334155;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --header-bg-color: rgba(30, 41, 59, 0.8);
+            --nav-bg-color: #1e293b;
+            --search-bg-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #e5e7eb;
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #app-container {
+            max-width: 420px;
+            height: 100vh;
+            max-height: 896px;
+            margin: auto;
+            background-color: var(--bg-color);
+            border-left: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        @media (min-width: 421px) {
+             #app-container {
+                margin: 2rem auto;
+                border-radius: 24px;
+             }
+        }
+
+        /* --- SCREEN & TRANSITION SYSTEM --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            transition: transform var(--transition-duration) ease-in-out;
+            overflow-y: auto;
+            padding: 20px 20px 100px 20px;
+            -webkit-overflow-scrolling: touch;
+            transform: translateX(100%);
+        }
+        
+        .screen-content {
+            padding-top: 50px;
+        }
+
+        .screen.active {
+            transform: translateX(0);
+        }
+        
+        .screen.is-leaving {
+            transform: translateX(-100%);
+        }
+        
+        #home-screen {
+            transform: translateX(0);
+        }
+
+        /* --- HEADERS & BACKGROUNDS --- */
+        .screen-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            background-color: transparent;
+            z-index: 10;
+        }
+        
+        .screen-header.has-bg {
+             background-color: var(--header-bg-color);
+             backdrop-filter: blur(10px);
+             -webkit-backdrop-filter: blur(10px);
+             border-bottom: 1px solid var(--border-color);
+        }
+
+        .screen-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+            width: 100%;
+            color: var(--text-color);
+        }
+        
+        .detail-bg-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .hide-images .detail-bg-container { display: none; }
+        .detail-bg-container svg { width: 100%; height: 100%; object-fit: cover; transform: scale(1.1); }
+
+        .back-button, .search-icon-btn {
+            background: none; border: none; cursor: pointer;
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            position: absolute; left: 8px; top: 10px;
+            color: var(--text-color); z-index: 11;
+        }
+        
+        .search-icon-btn { left: auto; right: 8px; }
+        .back-button svg, .search-icon-btn svg { width: 24px; height: 24px; }
+
+        /* --- BOTTOM NAVIGATION --- */
+        #bottom-nav {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 80px; background-color: var(--nav-bg-color);
+            border-top: 1px solid var(--border-color);
+            display: flex; justify-content: space-around;
+            align-items: flex-start; padding-top: 10px; z-index: 100;
+        }
+
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer; color: var(--text-muted-color);
+            font-size: 0.7rem; border: none; background: none; width: 60px;
+        }
+
+        .nav-item.active { color: var(--primary-color); }
+        .nav-item svg { width: 28px; height: 28px; margin-bottom: 4px; }
+
+        /* --- GENERAL COMPONENTS --- */
+        .btn {
+            display: inline-block; background-color: var(--primary-color); color: white;
+            padding: 12px 24px; border-radius: 8px; font-weight: 600;
+            text-decoration: none; border: none; cursor: pointer; transition: background-color 0.2s ease;
+        }
+        .btn:hover { background-color: var(--primary-hover-color); }
+        
+        .card {
+            background-color: var(--card-bg-color); border-radius: 12px;
+            padding: 20px; margin-bottom: 16px;
+            border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px var(--shadow-color);
+            transition: all 0.2s ease; cursor: pointer;
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px var(--shadow-color); }
+
+        /* --- HOME SCREEN --- */
+        #home-screen .screen-content {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; height: 100%;
+            padding-top: 0; padding-bottom: 80px;
+        }
+
+        .welcome-title {
+            font-size: 1.25rem; font-weight: 600;
+            color: var(--text-muted-color);
+        }
+
+        .hero-text {
+            font-size: clamp(3rem, 20vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            text-align: center;
+            margin: 0.5rem 0 1.5rem 0;
+            background: linear-gradient(45deg, var(--primary-color), var(--gradient-end-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
+        }
+        
+        .welcome-subtitle {
+            font-size: 1rem; color: var(--text-muted-color);
+            max-width: 30ch; margin: 0 auto 2.5rem auto;
+        }
+
+        /* --- CATEGORIES SCREEN --- */
+        .category-card { display: flex; justify-content: space-between; align-items: center; }
+        .category-card-text h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; color: var(--text-color); }
+        .category-card-text p { font-size: 0.9rem; color: var(--text-muted-color); }
+        .category-card-image {
+            width: 60px; height: 60px; border-radius: 8px;
+            background-color: var(--bg-color); border: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: center;
+            margin-left: 16px; flex-shrink: 0;
+        }
+        .hide-images .category-card-image { display: none; }
+        .category-card-image svg { width: 100%; height: 100%; border-radius: 7px; }
+        
+        /* --- CATEGORY/BIAS DETAIL SCREEN --- */
+        #category-detail-screen .screen-content, #bias-detail-screen .screen-content { padding-top: 130px; }
+        .hide-images #category-detail-screen .screen-content, .hide-images #bias-detail-screen .screen-content { padding-top: 70px; }
+        .subcategory-group { margin-bottom: 2rem; }
+        .subcategory-header {
+            font-size: 1rem; font-weight: 600; padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+        .bias-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid var(--border-color);
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .bias-list-item:hover { background-color: var(--search-bg-color); }
+        .bias-list-item h4 { font-weight: 500; padding-right: 1rem; }
+        .bias-list-item svg { width: 20px; height: 20px; color: var(--text-muted-color); flex-shrink: 0; }
+        .content-section { margin-bottom: 2rem; }
+        .content-section h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-color); }
+        .content-section p { font-size: 1rem; line-height: 1.6; color: var(--text-muted-color); }
+        .quiz-button-container { text-align: center; margin-top: 2rem; }
+        
+        /* --- SEARCH SCREEN --- */
+        .search-bar-container { position: relative; margin-bottom: 1.5rem; }
+        #search-input {
+            width: 100%; padding: 12px 16px 12px 40px; border-radius: 8px;
+            border: 1px solid var(--border-color); background-color: var(--search-bg-color);
+            font-size: 1rem; color: var(--text-color); outline: none;
+        }
+        #search-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+        .search-bar-container svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--text-muted-color); }
+        .search-result-item { padding: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .search-result-item:hover { background-color: var(--search-bg-color); }
+        .search-result-item h4 { font-weight: 500; }
+        .search-result-item p { font-size: 0.85rem; color: var(--text-muted-color); }
+        #no-results-message, #search-prompt-message { text-align: center; color: var(--text-muted-color); margin-top: 2rem; padding: 0 1rem; }
+
+        /* --- SETTINGS MODAL --- */
+        #settings-modal {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+            background-color: var(--card-bg-color);
+            border-top-left-radius: 20px; border-top-right-radius: 20px;
+            padding: 20px; box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(100%); transition: transform 0.3s ease-in-out;
+        }
+        #settings-modal.active { transform: translateY(0); }
+        .settings-header { text-align: center; font-size: 1.2rem; font-weight: 600; margin-bottom: 24px; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border-color); }
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(22px); }
+        #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 199; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out; }
+        #modal-overlay.active { opacity: 1; visibility: visible; }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <main id="main-content">
+            <!-- Home Screen -->
+            <div id="home-screen" class="screen active">
+                <div class="screen-content">
+                    <h1 class="welcome-title">Bias Explorer</h1>
+                    <div class="hero-text">Unbias Your Mind</div>
+                    <p class="welcome-subtitle">Explore cognitive biases and logical fallacies to think more clearly.</p>
+                    <button id="start-exploring-btn" class="btn">Start Exploring</button>
+                </div>
+            </div>
+
+            <!-- Categories Screen -->
+            <div id="categories-screen" class="screen">
+                <header class="screen-header has-bg">
+                    <h2>Cognitive Biases</h2>
+                    <button class="search-icon-btn" data-target="search-screen" aria-label="Search biases">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                    </button>
+                </header>
+                <div class="screen-content" id="categories-list"></div>
+            </div>
+            
+            <!-- Category Detail Screen -->
+            <div id="category-detail-screen" class="screen">
+                <div class="detail-bg-container"></div>
+                <header class="screen-header">
+                    <button class="back-button" aria-label="Go back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2 id="category-detail-title"></h2>
+                </header>
+                <div class="screen-content" id="category-detail-content"></div>
+            </div>
+            
+            <!-- Bias Detail Screen -->
+            <div id="bias-detail-screen" class="screen">
+                <div class="detail-bg-container"></div>
+                <header class="screen-header">
+                    <button class="back-button" aria-label="Go back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2 id="bias-detail-title"></h2>
+                </header>
+                <div class="screen-content" id="bias-detail-content"></div>
+            </div>
+
+            <!-- Search Screen -->
+            <div id="search-screen" class="screen">
+                 <header class="screen-header has-bg">
+                    <button class="back-button" aria-label="Go back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>
+                    <h2>Search</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="search-bar-container">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                         <input type="text" id="search-input" placeholder="Search for a bias..." aria-label="Search for a bias">
+                    </div>
+                    <div id="search-results-container">
+                        <p id="search-prompt-message">Start typing to search for a bias.</p>
+                        <div id="search-results"></div>
+                        <p id="no-results-message" style="display: none;">No biases found.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <nav id="bottom-nav">
+            <button class="nav-item active" data-target="home-screen" aria-label="Home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" /><path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" /></svg><span>Home</span></button>
+            <button class="nav-item" data-target="categories-screen" aria-label="Categories"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg><span>Categories</span></button>
+            <button class="nav-item" data-target="search-screen" aria-label="Search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" clip-rule="evenodd" /></svg><span>Search</span></button>
+            <button id="settings-btn" class="nav-item" aria-label="Settings"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.946 1.55l-.26 1.037a1.875 1.875 0 01-.453.823l-.759.758a1.875 1.875 0 00-2.652 2.652l.758.759c.26.26.463.57.598.901l.26 1.037c.247.887 1.03.1.55 1.946 0 .917.663 1.699 1.55 1.946l1.037.26a1.875 1.875 0 01.823.453l.758.759a1.875 1.875 0 002.652 2.652l.759-.758a1.875 1.875 0 01.901-.598l1.037-.26c.887-.247 1.55-1.029 1.55-1.946 0-.917-.663-1.699-1.55-1.946l-1.037-.26a1.875 1.875 0 01-.823-.453l-.758-.759a1.875 1.875 0 00-2.652-2.652l-.759.758a1.875 1.875 0 01-.901.598l-1.037.26c-.887.247-1.55 1.029-1.55 1.946L9.53 16.45c-.247.887-1.029 1.55-1.946 1.55-.917 0-1.699-.663-1.946-1.55l-.26-1.037a1.875 1.875 0 01.453-.823l.759-.758a1.875 1.875 0 002.652-2.652l-.758-.759a1.875 1.875 0 01-.598-.901l-.26-1.037c-.247-.887-1.03-1.55-1.946-1.55zM12 8.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5z" clip-rule="evenodd" /></svg><span>Settings</span></button>
+        </nav>
+    </div>
+
+    <div id="modal-overlay"></div>
+    <div id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-header">
+        <h3 id="settings-header" class="settings-header">Settings</h3>
+        <div class="setting-item"><span>Dark Mode</span><label class="toggle-switch"><input type="checkbox" id="dark-mode-toggle"><span class="slider"></span></label></div>
+        <div class="setting-item"><span>Show Images</span><label class="toggle-switch"><input type="checkbox" id="image-toggle" checked><span class="slider"></span></label></div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- DATA ---
+            const cognitiveBiasesData = {
+                "too-much-information": {
+                    name: "Too Much Information", description: "We filter out, pay attention to specifics, and fill in gaps.",
+                    image: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect fill="#fffbeb" width="100" height="100"/><path fill="#fca5a5" d="M0 40h60v60H0z"/><path fill="#94a3b8" d="M50 0h50v50H50z"/></svg>`,
+                    backgroundImage: `<svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><filter id="blur1"><feGaussianBlur stdDeviation="15"/></filter><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fecaca"/><stop offset="100%" stop-color="#a5b4fc"/></linearGradient></defs><rect width="420" height="150" fill="url(#grad1)"/><rect x="50" y="-20" width="200" height="200" fill="#fca5a5" opacity="0.5" filter="url(#blur1)" transform="rotate(15, 150, 80)"/><rect x="180" y="0" width="250" height="100" fill="#a5b4fc" opacity="0.4" filter="url(#blur1)" transform="rotate(-20, 305, 50)"/></svg>`,
+                    subcategories: {
+                        "primed-or-repeated": { name: "We notice things already primed in memory or repeated often", biases: ["Attentional bias", "Availability heuristic", "Baader–Meinhof phenomenon (frequency illusion)", "Cue-dependent forgetting", "Empathy gap", "Frequency illusion", "Illusory truth effect", "Mere exposure effect", "Modality effect", "Priming", "Recency illusion", "Repetition bias", "Salience bias", "Selection bias", "Serial position effect", "Von Restorff effect (isolation effect)"] },
+                        "bizarre-or-funny": { name: "Bizarre, funny, visually striking, or anthropomorphic things stick out more than non-bizarre/unfunny things", biases: ["Humor effect", "Picture superiority effect", "Bizarreness effect", "Self-relevance effect"] },
+                        "changed": { name: "We notice when something has changed", biases: ["Change blindness", "Cyclical thinking", "Anchoring", "Conservatism bias", "Distinction bias"] },
+                        "confirm-beliefs": { name: "We are drawn to details that confirm our own beliefs", biases: ["Confirmation bias", "Congruence bias", "Experimenter’s bias", "Observer-expectancy effect", "Ostrich effect", "Semmelweis reflex", "Subjective validation"] },
+                        "flaws-in-others": { name: "We notice flaws in others more than in ourselves", biases: ["Bias blind spot", "Naïve cynicism", "Naïve realism"] },
+                        "find-patterns": { name: "We tend to find stories and patterns even in sparse data", biases: ["Clustering illusion", "Conjunction fallacy", "Gambler’s fallacy", "Illusory correlation", "Pareidolia", "Anthropomorphism"] }
+                    }
+                },
+                "not-enough-meaning": {
+                    name: "Not Enough Meaning", description: "We seek patterns and connections, even if they're not real.",
+                    image: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect fill="#fef3c7" width="100" height="100"/><path d="M20,20 C40,60 60,60 80,20" stroke="#fcd34d" fill="none" stroke-width="8"/><path d="M20,80 C40,40 60,40 80,80" stroke="#fbbf24" fill="none" stroke-width="8"/></svg>`,
+                    backgroundImage: `<svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><filter id="blur2"><feGaussianBlur stdDeviation="20"/></filter><linearGradient id="grad2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#fde68a"/><stop offset="100%" stop-color="#fed7aa"/></linearGradient></defs><rect width="420" height="150" fill="url(#grad2)"/><path d="M -50,75 C 150,-20 270,170 470,75" stroke="#fcd34d" fill="none" stroke-width="60" opacity="0.5" filter="url(#blur2)"/><path d="M -50,75 C 150,170 270,-20 470,75" stroke="#fbbf24" fill="none" stroke-width="40" opacity="0.5" filter="url(#blur2)"/></svg>`,
+                    subcategories: {
+                        "stereotypes": { name: "We fill in characteristics from stereotypes, generalities, and prior histories", biases: ["Cross-race effect", "Out-group homogeneity bias", "In-group bias", "Stereotyping"] },
+                        "familiar-is-better": { name: "We imagine things and people we’re familiar with or fond of as better", biases: ["Cheerleader effect", "Halo effect", "Positivity effect", "Positivity bias", "Negativity bias", "Trait ascription bias"] },
+                        "simplify-numbers": { name: "We simplify probabilities and numbers to make them easier to think about", biases: ["Normalcy bias", "Subadditivity effect", "Denomination effect"] },
+                        "know-others-thinking": { name: "We think we know what others are thinking", biases: ["Curse of knowledge", "Illusion of transparency", "Mind reading illusion", "Spotlight effect"] },
+                        "project-mindset": { name: "We project our current mindset and assumptions onto the past and future", biases: ["Impact bias", "Pessimism bias", "Planning fallacy", "Pro-innovation bias", "Projection bias", "Restraint bias", "Self-consistency bias", "Telescoping effect"] }
+                    }
+                },
+                "need-to-act-fast": {
+                    name: "Need To Act Fast", description: "We make quick decisions to survive and avoid danger.",
+                    image: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect fill="#ecfdf5" width="100" height="100"/><path d="M50 10L90 90H10z" fill="#6ee7b7"/><path d="M50 90L10 10h80z" fill="#34d399"/></svg>`,
+                    backgroundImage: `<svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><filter id="blur3"><feGaussianBlur stdDeviation="12"/></filter><linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#6ee7b7"/><stop offset="100%" stop-color="#a7f3d0"/></linearGradient></defs><rect width="420" height="150" fill="url(#grad3)"/><path d="M-20 -20 L 210 170 L 190 -20 Z" fill="#34d399" opacity="0.4" filter="url(#blur3)"/><path d="M 230 -20 L 440 170 L 420 -20 Z" fill="#10b981" opacity="0.3" filter="url(#blur3)"/></svg>`,
+                    subcategories: {
+                        "must-be-confident": { name: "To act, we must be confident we can make an impact and feel what we do is important", biases: ["Optimism bias", "Overconfidence effect", "Egocentric bias", "Hard–easy effect", "Illusion of control", "Social desirability bias", "Dunning–Kruger effect"] },
+                        "favor-immediate": { name: "To stay focused, we favor the immediate, relatable thing in front of us", biases: ["Hyperbolic discounting", "Present bias", "Appeal to noveltyu", "Identifiable victim effect", "Unit bias", "Zero-risk bias"] },
+                        "complete-things": { name: "To get things done, we tend to complete things we’ve invested time and energy in", biases: ["Sunk cost fallacy", "Escalation of commitment", "IKEA effect", "Endowment effect", "Loss aversion", "Pseudocertainty effect"] },
+                        "avoid-mistakes": { name: "To avoid mistakes, we aim to preserve autonomy and group status, and avoid irreversible decisions", biases: ["Status quo bias", "System justification", "Reactance", "Omission bias", "Decoy effect", "Reverse psychology"] },
+                        "favor-simple": { name: "We favor simple-looking options over complex, ambiguous ones", biases: ["Ambiguity effect", "Information bias", "Overchoice", "Paradox of choice"] }
+                    }
+                },
+                "what-should-we-remember": {
+                    name: "What Should We Remember?", description: "We edit and reinforce memories after the fact.",
+                    image: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect fill="#eef2ff" width="100" height="100"/><circle cx="50" cy="50" r="40" fill="#c7d2fe"/><circle cx="50" cy="50" r="30" fill="#a5b4fc"/><circle cx="50" cy="50" r="20" fill="#818cf8"/></svg>`,
+                    backgroundImage: `<svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><filter id="blur4"><feGaussianBlur stdDeviation="18"/></filter><radialGradient id="grad4" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="#c7d2fe"/><stop offset="100%" stop-color="#818cf8"/></radialGradient></defs><rect width="420" height="150" fill="url(#grad4)"/><circle cx="100" cy="75" r="80" fill="#a5b4fc" opacity="0.5" filter="url(#blur4)"/><circle cx="320" cy="75" r="90" fill="#e0e7ff" opacity="0.4" filter="url(#blur4)"/></svg>`,
+                    subcategories: {
+                        "edit-memories": { name: "We edit and reinforce some memories after the fact", biases: ["Consistency bias", "Misinformation effect", "Misattribution of memory", "Source confusion", "False memory", "Suggestibility"] },
+                        "form-generalities": { name: "We discard specifics to form generalities", biases: ["Leveling and sharpening", "Stereotypical generalization"] },
+                        "reduce-to-elements": { name: "We reduce events and lists to their key elements", biases: ["Serial position effect", "Peak–end rule", "List length effect"] },
+                        "store-differently": { name: "We store memories differently based on how they were experienced", biases: ["Context effect", "Mood-congruent memory bias", "State-dependent memory"] }
+                    }
+                }
+            };
+            
+            const allBiasesFlat = Object.entries(cognitiveBiasesData).flatMap(([categoryId, category]) =>
+                Object.values(category.subcategories).flatMap(subcategory =>
+                    subcategory.biases.map(biasName => ({
+                        name: biasName, categoryName: category.name, categoryId: categoryId,
+                        definition: `The tendency to ${biasName.toLowerCase().replace(/ effect| bias| fallacy| reflex/g, '')}. This is a placeholder definition for "${biasName}".`,
+                        example: `For example, a person exhibiting ${biasName} might... (This is a placeholder example).`,
+                        mitigation: `To combat ${biasName}, one can try to be more aware of their thought processes and actively seek out disconfirming evidence or alternative perspectives.`
+                    }))
+                )
+            );
+
+            // --- STATE & DOM ---
+            let navigationStack = ['home-screen'];
+            const mainContent = document.getElementById('main-content');
+            const navItems = document.querySelectorAll('.nav-item');
+            const settingsBtn = document.getElementById('settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const modalOverlay = document.getElementById('modal-overlay');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const imageToggle = document.getElementById('image-toggle');
+
+            // --- NAVIGATION ---
+            function navigateTo(screenId) {
+                const currentScreenId = navigationStack[navigationStack.length - 1];
+                if (currentScreenId === screenId) return;
+                const newScreen = document.getElementById(screenId);
+                const currentScreen = document.getElementById(currentScreenId);
+                if (currentScreen) currentScreen.classList.add('is-leaving');
+                newScreen.classList.add('active');
+                navigationStack.push(screenId);
+                updateNav();
+                setTimeout(() => { if (currentScreen) currentScreen.classList.remove('active', 'is-leaving'); }, 350);
+            }
+
+            function goBack() {
+                if (navigationStack.length <= 1) return;
+                const currentScreenId = navigationStack.pop();
+                const newScreenId = navigationStack[navigationStack.length - 1];
+                document.getElementById(currentScreenId).classList.remove('active');
+                const newScreen = document.getElementById(newScreenId);
+                newScreen.classList.add('active');
+                newScreen.classList.remove('is-leaving');
+                updateNav();
+            }
+            
+            function navigateToTab(screenId) {
+                if (navigationStack[0] === screenId && navigationStack.length === 1) return;
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'is-leaving'));
+                document.getElementById(screenId).classList.add('active');
+                navigationStack = [screenId];
+                updateNav();
+            }
+
+            function updateNav() {
+                const currentTabId = navigationStack[0];
+                navItems.forEach(item => item.classList.toggle('active', item.dataset.target === currentTabId));
+            }
+
+            // --- RENDERING ---
+            function renderCategories() {
+                document.getElementById('categories-list').innerHTML = Object.entries(cognitiveBiasesData).map(([id, category]) => `
+                    <div class="card category-card" data-category-id="${id}">
+                        <div class="category-card-text"><h3>${category.name}</h3><p>${category.description}</p></div>
+                        <div class="category-card-image">${category.image}</div>
+                    </div>`).join('');
+            }
+
+            function renderCategoryDetail(categoryId) {
+                const category = cognitiveBiasesData[categoryId];
+                const screen = document.getElementById('category-detail-screen');
+                screen.querySelector('.detail-bg-container').innerHTML = category.backgroundImage;
+                screen.querySelector('#category-detail-title').innerText = category.name;
+                screen.querySelector('#category-detail-content').innerHTML = Object.values(category.subcategories).map(sub => `
+                    <div class="subcategory-group">
+                        <h3 class="subcategory-header">${sub.name}</h3>
+                        ${sub.biases.map(biasName => `<div class="bias-list-item" data-bias-name="${biasName}"><h4>${biasName}</h4><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></div>`).join('')}
+                    </div>`).join('');
+                screen.scrollTop = 0;
+                navigateTo('category-detail-screen');
+            }
+
+            function renderBiasDetail(biasName) {
+                const bias = allBiasesFlat.find(b => b.name === biasName);
+                if (!bias) return;
+                const category = cognitiveBiasesData[bias.categoryId];
+                const screen = document.getElementById('bias-detail-screen');
+                screen.querySelector('.detail-bg-container').innerHTML = category.backgroundImage;
+                screen.querySelector('#bias-detail-title').innerText = bias.name;
+                screen.querySelector('#bias-detail-content').innerHTML = `
+                    <div class="content-section"><h3>Definition</h3><p>${bias.definition}</p></div>
+                    <div class="content-section"><h3>Examples</h3><p>${bias.example}</p></div>
+                    <div class="content-section"><h3>Mitigation Strategies</h3><p>${bias.mitigation}</p></div>
+                    <div class="quiz-button-container"><button class="btn quiz-btn" data-bias-name="${bias.name}">Take a Quiz</button></div>`;
+                screen.scrollTop = 0;
+                navigateTo('bias-detail-screen');
+            }
+
+            function renderSearchResults(query) {
+                const resultsContainer = document.getElementById('search-results');
+                const noResultsEl = document.getElementById('no-results-message');
+                const searchPrompt = document.getElementById('search-prompt-message');
+                query = query.trim().toLowerCase();
+                searchPrompt.style.display = query ? 'none' : 'block';
+                if (!query) { resultsContainer.innerHTML = ''; noResultsEl.style.display = 'none'; return; }
+                const filteredBiases = allBiasesFlat.filter(b => b.name.toLowerCase().includes(query));
+                noResultsEl.style.display = filteredBiases.length === 0 ? 'block' : 'none';
+                resultsContainer.innerHTML = filteredBiases.map(bias => `<div class="search-result-item" data-bias-name="${bias.name}"><h4>${bias.name}</h4><p>${bias.categoryName}</p></div>`).join('');
+            }
+            
+            // --- SETTINGS ---
+            function applySettings() {
+                const isDarkMode = localStorage.getItem('darkMode') === 'true';
+                darkModeToggle.checked = isDarkMode;
+                document.documentElement.classList.toggle('dark-mode', isDarkMode);
+                const showImages = localStorage.getItem('showImages') !== 'false';
+                imageToggle.checked = showImages;
+                document.body.classList.toggle('hide-images', !showImages);
+            }
+
+            // --- EVENT LISTENERS ---
+            document.getElementById('start-exploring-btn').addEventListener('click', () => navigateToTab('categories-screen'));
+            navItems.forEach(item => { if (item.id !== 'settings-btn') item.addEventListener('click', () => navighttps://github.com/alexquinnbc/cb01/new/mainateToTab(item.dataset.target)); });
+            document.querySelectorAll('.back-button').forEach(btn => btn.addEventListener('click', goBack));
+            document.querySelectorAll('.search-icon-btn').forEach(btn => btn.addEventListener('click', () => navigateToTab(btn.dataset.target)));
+            mainContent.addEventListener('click', e => {
+                const categoryCard = e.target.closest('.category-card');
+                if (categoryCard) renderCategoryDetail(categoryCard.dataset.categoryId);
+                const biasListItem = e.target.closest('.bias-list-item, .search-result-item');
+                if (biasListItem) renderBiasDetail(biasListItem.dataset.biasName);
+                const quizBtn = e.target.closest('.quiz-btn');
+                if (quizBtn) alert(`Quiz for "${quizBtn.dataset.biasName}" is not yet implemented.`);
+            });
+            document.getElementById('search-input').addEventListener('input', e => renderSearchResults(e.target.value));
+            settingsBtn.addEventListener('click', () => { settingsModal.classList.add('active'); modalOverlay.classList.add('active'); });
+            modalOverlay.addEventListener('click', () => { settingsModal.classList.remove('active'); modalOverlay.classList.remove('active'); });
+            darkModeToggle.addEventListener('change', () => {
+                const isDark = darkModeToggle.checked;
+                document.documentElement.classList.toggle('dark-mode', isDark);
+                localStorage.setItem('darkMode', String(isDark));
+            });
+            imageToggle.addEventListener('change', () => {
+                const showImages = imageToggle.checked;
+                document.body.classList.toggle('hide-images', !showImages);
+                localStorage.setItem('showImages', String(showImages));
+            });
+
+            // --- INITIALIZATION ---
+            applySettings();
+            renderCategories();
+            updateNav();
+        });
+    </script>
+</body>
+</html>
