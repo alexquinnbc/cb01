@@ -1,0 +1,244 @@
+"] },
+                        "form-generalities": { name: "We discard specifics to form generalities", biases: ["Leveling and sharpening", "Stereotypical generalization"] },
+                        "reduce-to-elements": { name: "We reduce events and lists to their key elements", biases: ["Serial position effect", "Peak–end rule", "List length effect"] },
+                        "store-differently": { name: "We store memories differently based on how they were experienced", biases: ["Context effect", "Mood-congruent memory bias", "State-dependent memory"] }
+                    }
+                }
+            };
+            
+            const allBiasesFlat = [];
+            for (const categoryId in cognitiveBiasesData) {
+                const category = cognitiveBiasesData[categoryId];
+                for (const subcategoryId in category.subcategories) {
+                    const subcategory = category.subcategories[subcategoryId];
+                    subcategory.biases.forEach(biasName => {
+                        allBiasesFlat.push({
+                            name: biasName,
+                            categoryName: category.name,
+                            categoryId: categoryId,
+                            definition: `The tendency to ${biasName.toLowerCase().replace(/ effect| bias| fallacy| reflex/g, '')}. This is a placeholder definition for "${biasName}".`,
+                            example: `For example, a person exhibiting ${biasName} might... (This is a placeholder example).`,
+                            mitigation: `To combat ${biasName}, one can try to be more aware of their thought processes and actively seek out disconfirming evidence or alternative perspectives.`
+                        });
+                    });
+                }
+            }
+            
+            // --- DOM ELEMENTS & STATE ---
+            const mainContent = document.getElementById('main-content');
+            const navItems = document.querySelectorAll('.nav-item');
+            const settingsBtn = document.getElementById('settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const modalOverlay = document.getElementById('modal-overlay');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const imageToggle = document.getElementById('image-toggle');
+
+            let navigationStack = ['home-screen'];
+            const transitionTime = 350;
+
+            // --- NAVIGATION ---
+            const navigateTo = (screenId) => {
+                const currentScreenId = navigationStack[navigationStack.length - 1];
+                if (currentScreenId === screenId) return;
+
+                const newScreen = document.getElementById(screenId);
+                const currentScreen = document.getElementById(currentScreenId);
+
+                if (currentScreen) currentScreen.classList.add('is-leaving');
+                
+                newScreen.classList.add('active');
+                
+                navigationStack.push(screenId);
+                updateNav(screenId);
+                
+                setTimeout(() => {
+                    if (currentScreen) currentScreen.classList.remove('active', 'is-leaving');
+                }, transitionTime);
+            };
+
+            const goBack = () => {
+                if (navigationStack.length <= 1) return;
+
+                const currentScreenId = navigationStack.pop();
+                const newScreenId = navigationStack[navigationStack.length - 1];
+                
+                const currentScreen = document.getElementById(currentScreenId);
+                const newScreen = document.getElementById(newScreenId);
+
+                newScreen.classList.add('active');
+                newScreen.classList.remove('is-leaving');
+                
+                currentScreen.classList.remove('active');
+
+                updateNav(newScreenId);
+            };
+            
+            const navigateToTab = (screenId) => {
+                const currentScreenId = navigationStack[0];
+                if (currentScreenId === screenId) return;
+
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'is-leaving'));
+                
+                document.getElementById(screenId).classList.add('active');
+                navigationStack = [screenId];
+                updateNav(screenId);
+            };
+
+            const updateNav = (targetId) => {
+                const baseScreen = ['home-screen', 'categories-screen', 'search-screen'].includes(navigationStack[0]) 
+                    ? navigationStack[0] 
+                    : 'categories-screen';
+                
+                navItems.forEach(item => {
+                    item.classList.toggle('active', item.dataset.target === baseScreen);
+                });
+            };
+
+            // --- RENDERING ---
+            const renderCategories = () => {
+                const listEl = document.getElementById('categories-list');
+                listEl.innerHTML = Object.entries(cognitiveBiasesData).map(([id, category]) => `
+                    <div class="card category-card" data-category-id="${id}">
+                        <div class="category-card-text">
+                            <h3>${category.name}</h3>
+                            <p>${category.description}</p>
+                        </div>
+                        <div class="category-card-image">${category.image}</div>
+                    </div>
+                `).join('');
+            };
+
+            const renderCategoryDetail = (categoryId) => {
+                const category = cognitiveBiasesData[categoryId];
+                const screen = document.getElementById('category-detail-screen');
+                
+                screen.querySelector('.detail-bg-container').innerHTML = category.backgroundImage;
+                screen.querySelector('#category-detail-title').innerText = category.name;
+                
+                let html = '';
+                for (const subId in category.subcategories) {
+                    const subcategory = category.subcategories[subId];
+                    html += `<div class="subcategory-group">
+                                <h3 class="subcategory-header">${subcategory.name}</h3>`;
+                    html += subcategory.biases.map(biasName => `
+                        <div class="bias-list-item" data-bias-name="${biasName}">
+                            <h4>${biasName}</h4>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                        </div>`).join('');
+                    html += `</div>`;
+                }
+                screen.querySelector('#category-detail-content').innerHTML = html;
+                screen.scrollTop = 0;
+                navigateTo('category-detail-screen');
+            };
+
+            const renderBiasDetail = (biasName) => {
+                const bias = allBiasesFlat.find(b => b.name === biasName);
+                if (!bias) return;
+
+                const category = cognitiveBiasesData[bias.categoryId];
+                const screen = document.getElementById('bias-detail-screen');
+
+                screen.querySelector('.detail-bg-container').innerHTML = category.backgroundImage;
+                screen.querySelector('#bias-detail-title').innerText = bias.name;
+                screen.querySelector('#bias-detail-content').innerHTML = `
+                    <div class="content-section"><h3>Definition</h3><p>${bias.definition}</p></div>
+                    <div class="content-section"><h3>Examples</h3><p>${bias.example}</p></div>
+                    <div class="content-section"><h3>Mitigation Strategies</h3><p>${bias.mitigation}</p></div>
+                    <div class="quiz-button-container"><button class="btn">Take a Quiz</button></div>
+                `;
+                screen.scrollTop = 0;
+                navigateTo('bias-detail-screen');
+            };
+
+            const renderSearchResults = (query) => {
+                const resultsContainer = document.getElementById('search-results');
+                const noResultsEl = document.getElementById('no-results-message');
+                const searchPrompt = document.getElementById('search-prompt-message');
+                
+                query = query.trim().toLowerCase();
+                if (!query) {
+                    resultsContainer.innerHTML = '';
+                    noResultsEl.style.display = 'none';
+                    searchPrompt.style.display = 'block';
+                    return;
+                }
+                
+                searchPrompt.style.display = 'none';
+                const filteredBiases = allBiasesFlat.filter(b => b.name.toLowerCase().includes(query));
+                
+                noResultsEl.style.display = filteredBiases.length === 0 ? 'block' : 'none';
+                
+                resultsContainer.innerHTML = filteredBiases.map(bias => `
+                    <div class="search-result-item" data-bias-name="${bias.name}">
+                        <h4>${bias.name}</h4>
+                        <p>${bias.categoryName}</p>
+                    </div>
+                `).join('');
+            };
+            
+            // --- SETTINGS ---
+            const applySettings = () => {
+                const isDarkMode = localStorage.getItem('darkMode') === 'true';
+                darkModeToggle.checked = isDarkMode;
+                document.documentElement.classList.toggle('dark-mode', isDarkMode);
+                
+                const showImages = localStorage.getItem('showImages') !== 'false';
+                imageToggle.checked = showImages;
+                document.body.classList.toggle('hide-images', !showImages);
+            };
+
+            // --- EVENT LISTENERS ---
+            document.getElementById('start-exploring-btn').addEventListener('click', () => navigateToTab('categories-screen'));
+            
+            navItems.forEach(item => {
+                if (item.id !== 'settings-btn') {
+                    item.addEventListener('click', () => navigateToTab(item.dataset.target));
+                }
+            });
+
+            document.querySelectorAll('.back-button, .search-icon-btn').forEach(btn => {
+                if (btn.classList.contains('back-button')) btn.addEventListener('click', goBack);
+                else btn.addEventListener('click', () => navigateToTab(btn.dataset.target));
+            });
+
+            mainContent.addEventListener('click', e => {
+                const categoryCard = e.target.closest('.category-card');
+                if (categoryCard) renderCategoryDetail(categoryCard.dataset.categoryId);
+
+                const biasListItem = e.target.closest('.bias-list-item, .search-result-item');
+                if (biasListItem) renderBiasDetail(biasListItem.dataset.biasName);
+            });
+            
+            document.getElementById('search-input').addEventListener('input', e => renderSearchResults(e.target.value));
+            
+            settingsBtn.addEventListener('click', () => {
+                settingsModal.classList.add('active');
+                modalOverlay.classList.add('active');
+            });
+
+            modalOverlay.addEventListener('click', () => {
+                settingsModal.classList.remove('active');
+                modalOverlay.classList.remove('active');
+            });
+            
+            darkModeToggle.addEventListener('change', () => {
+                const isDark = darkModeToggle.checked;
+                document.documentElement.classList.toggle('dark-mode', isDark);
+                localStorage.setItem('darkMode', isDark);
+            });
+            
+            imageToggle.addEventListener('change', () => {
+                const showImages = imageToggle.checked;
+                document.body.classList.toggle('hide-images', !showImages);
+                localStorage.setItem('showImages', showImages);
+            });
+
+            // --- INITIALIZATION ---
+            applySettings();
+            renderCategories();
+            updateNav('home-screen');
+        });
+    </script>
+</body>
+</html>
