@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SVG + CSS Animation Example</title>
+<style>
+  body {
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+
+  svg {
+    width: 300px;
+    height: 300px;
+  }
+
+  /* Gradient Animation */
+  #grad1 stop {
+    animation: gradientShift 4s ease-in-out infinite alternate;
+  }
+  @keyframes gradientShift {
+    0% { stop-color: #ff6b6b; }
+    100% { stop-color: #4ecdc4; }
+  }
+
+  /* Circle Bounce */
+  #bouncy-circle {
+    animation: bounce 2s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-30px); }
+  }
+
+  /* Path Drawing */
+  #draw-path {
+    stroke-dasharray: 300;
+    stroke-dashoffset: 300;
+    animation: drawLine 3s ease forwards;
+  }
+  @keyframes drawLine {
+    to { stroke-dashoffset: 0; }
+  }
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 200 200">
+  <!-- Gradient Def -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" />
+      <stop offset="100%" stop-color="#4ecdc4" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Rectangle -->
+  <rect width="200" height="200" rx="20" fill="url(#grad1)" />
+
+  <!-- Bouncy Circle -->
+  <circle id="bouncy-circle" cx="100" cy="100" r="20" fill="white" />
+
+  <!-- Drawn Path -->
+  <path id="draw-path"
+        d="M 50 150 C 75 100, 125 100, 150 150"
+        stroke="white"
+        stroke-width="3"
+        fill="none" />
+</svg>
+
+</body>
+</html>
